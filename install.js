@@ -21,7 +21,8 @@ var url = require('url')
 var util = require('util')
 var which = require('which')
 
-var downloadUrl = 'http://download.slimerjs.org/releases/'+ helper.version +'/slimerjs-'+ helper.version +'-'
+var cdnUrl = process.env.npm_config_slimerjs_cdnurl || process.env.SLIMERJS_CDNURL ||'http://download.slimerjs.org/releases/'
+var downloadUrl = cdnUrl + helper.version +'/slimerjs-'+ helper.version +'-'
 
 var originalPath = process.env.PATH
 
