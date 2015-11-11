@@ -41,18 +41,20 @@
   },
   "scripts": {
     "install": "node install.js",
-    "test": "nodeunit --reporter=minimal test/tests.js"
+    "test": "nodeunit --reporter=minimal test/tests.js && eslint install.js"
   },
   "dependencies": {
     "adm-zip": "0.4.7",
+    "fs-extra": "~0.23.1",
     "kew": "~0.6.0",
-    "ncp": "2.0.0",
     "npmconf": "2.1.2",
-    "mkdirp": "0.5.1",
-    "rimraf": "~2.4.0",
+    "progress": "1.1.8",
+    "request": "2.42.0",
+    "request-progress": "0.3.1",
     "which": "~1.1.1"
   },
   "devDependencies": {
+    "eslint": "1.5.1",
     "nodeunit": "~0.9.1"
   }
 }

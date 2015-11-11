@@ -71,6 +71,40 @@ with an additional build number that is used for revisions to the installer.
 As such `0.9.1-1` and `0.9.1-2` will both install SlimerJs 0.9.1 but the latter
 has newer changes to the installer.
 
+Deciding Where To Get SlimerJS
+-------------------------------
+
+By default, this package will download slimerjs from `http://download.slimerjs.org/releases/`.
+This should work fine for most people.
+
+##### Downloading from a custom URL
+
+If this site is down, or the Great Firewall is blocking it, you may need to use
+a download mirror. To set a mirror, set npm config property `slimerjs_cdnurl`.
+Default is ``.
+
+```shell
+npm install slimerjs --slimerjs_cdnurl=http://cnpmjs.org/downloads
+```
+
+Or add property into your `.npmrc` file (https://www.npmjs.org/doc/files/npmrc.html)
+
+```
+slimerjs_cdnurl=http://cnpmjs.org/downloads
+```
+
+Another option is to use PATH variable `SLIMERJS_CDNURL`.
+```shell
+SLIMERJS_CDNURL=http://cnpmjs.org/downloads npm install phantomjs
+```
+
+##### Using SlimerJS from disk
+
+If you plan to install slimerjs many times on a single machine, you can
+install the `slimerjs` binary on PATH. The installer will automatically detect
+and use that for non-global installs.
+
+
 A Note on SlimerJS
 -------------------
 
@@ -85,6 +119,66 @@ I have had reasonable experiences writing standalone Slimer scripts which I
 then drive from within a node program by spawning slimer in a child process.
 
 Read the SlimerJS FAQ for more details: http://slimerjs.org/faq.html
+
+Troubleshooting
+---------------
+
+##### Installation fails with `spawn ENOENT`
+
+This is NPM's way of telling you that it was not able to start a process. It usually means:
+
+- `node` is not on your PATH, or otherwise not correctly installed.
+- `tar` is not on your PATH. This package expects `tar` on your PATH on Linux-based platforms.
+
+Check your specific error message for more information.
+
+##### Installation fails with `Error: EPERM` or `operation not permitted` or `permission denied`
+
+This error means that NPM was not able to install phantomjs to the file system. There are three
+major reasons why this could happen:
+
+- You don't have write access to the installation directory.
+- The permissions in the NPM cache got messed up, and you need to run `npm cache clean` to fix them.
+- You have over-zealous anti-virus software installed, and it's blocking file system writes.
+
+##### Installation fails with `Error: read ECONNRESET` or `Error: connect ETIMEDOUT`
+
+This error means that something went wrong with your internet connection, and the installer
+was not able to download the SlimerJS binary for your platform. Please try again.
+
+##### I tried again, but I get `ECONNRESET` or `ETIMEDOUT` consistently.
+
+Do you live in China, or a country with an authoritarian government? We've seen problems where
+the GFW or local ISP blocks slimerjs.org, preventing the installer from downloading the binary.
+
+Try visiting the [the download page](https://download.slimerjs.org/releases) manually.
+If that page is blocked, you can try using a different CDN with the `SLIMERJS_CDNURL`
+env variable described above.
+
+##### I am behind a corporate proxy that uses self-signed SSL certificates to intercept encrypted traffic.
+
+You can tell NPM and the SlimerJS installer to skip validation of ssl keys with NPM's
+[strict-ssl](https://www.npmjs.org/doc/misc/npm-config.html#strict-ssl) setting:
+
+```
+npm set strict-ssl false
+```
+
+WARNING: Turning off `strict-ssl` leaves you vulnerable to attackers reading
+your encrypted traffic, so run this at your own risk!
+
+##### I tried everything, but my network is b0rked. What do I do?
+
+If you install SlimerJS manually, and put it on PATH, the installer will try to
+use the manually-installed binaries.
+
+##### I'm on Debian or Ubuntu, and the installer failed because it couldn't find `node`
+
+Some Linux distros tried to rename `node` to `nodejs` due to a package
+conflict. This is a non-portable change, and we do not try to support this. The
+[official documentation](https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager#ubuntu-mint-elementary-os)
+recommends that you run `apt-get install nodejs-legacy` to symlink `node` to `nodejs`
+on those platforms, or many NodeJS programs won't work properly.
 
 Contributing
 ------------
