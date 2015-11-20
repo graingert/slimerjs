@@ -26,7 +26,7 @@ exports.testSlimerExecutesTestScript = function (test) {
     slimerjs.path,
     // SlimerJS arguments
     path.join(__dirname, 'loadspeed.js'),
-    'http://www.google.com/'
+    'https://www.google.com/'
   ]
 
   childProcess.execFile('xvfb-run', childArgs, function (err, stdout, stderr) {
