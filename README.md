@@ -3,7 +3,7 @@ slimerjs
 
 [![npm version](https://badge.fury.io/js/slimerjs.svg)](https://www.npmjs.com/package/slimerjs)
 
-An NPM wrapper for [SlimerJS](http://slimerjs.org/), a scriptable browser for web development and testing.
+An NPM wrapper for [SlimerJS](https://slimerjs.org/), a scriptable browser for web development and testing.
 
 SlimerJS runs on Gecko, the browser engine behind [Mozilla Firefox](https://www.mozilla.org/en-US/firefox/new/), and aims to be a simple, drop-in replacement for [phantomjs](https://github.com/Medium/phantomjs). Because SlimerJS uses the version of firefox passed in the `SLIMERJSLAUNCHER` environment variable, edge builds of firefox can be used. This can be useful for viewing and testing modern web functionality which is [not yet available in phantomjs](https://github.com/ariya/phantomjs/issues/10031).
 
@@ -77,7 +77,7 @@ has newer changes to the installer.
 Deciding Where To Get SlimerJS
 -------------------------------
 
-By default, this package will download slimerjs from `http://download.slimerjs.org/releases/`.
+By default, this package will download slimerjs from `https://download.slimerjs.org/releases/`.
 This should work fine for most people.
 
 ##### Downloading from a custom URL
@@ -87,18 +87,18 @@ a download mirror. To set a mirror, set npm config property `slimerjs_cdnurl`.
 Default is ``.
 
 ```shell
-npm install slimerjs --slimerjs_cdnurl=http://cnpmjs.org/downloads
+npm install slimerjs --slimerjs_cdnurl=https://cnpmjs.org/downloads
 ```
 
 Or add property into your `.npmrc` file (https://www.npmjs.org/doc/files/npmrc.html)
 
 ```
-slimerjs_cdnurl=http://cnpmjs.org/downloads
+slimerjs_cdnurl=https://cnpmjs.org/downloads
 ```
 
 Another option is to use PATH variable `SLIMERJS_CDNURL`.
 ```shell
-SLIMERJS_CDNURL=http://cnpmjs.org/downloads npm install phantomjs
+SLIMERJS_CDNURL=https://cnpmjs.org/downloads npm install phantomjs
 ```
 
 ##### Using SlimerJS from disk
@@ -121,7 +121,7 @@ It is not a Node JS wrapper.
 Standalone SlimerJS scripts can be driven from within a node program by spawning
 SlimerJS in a child process.
 
-Read the SlimerJS FAQ for more details: http://slimerjs.org/faq.html
+Read the SlimerJS FAQ for more details: https://slimerjs.org/faq.html
 
 Troubleshooting
 ---------------
@@ -152,7 +152,8 @@ was not able to download the SlimerJS binary for your platform. Please try again
 ##### I tried again, but I get `ECONNRESET` or `ETIMEDOUT` consistently.
 
 Do you live in China, or a country with an authoritarian government? We've seen problems where
-the GFW or local ISP blocks slimerjs.org, preventing the installer from downloading the binary.
+the GFW or local ISP blocks https://slimerjs.org, preventing the installer from downloading the
+binary.
 
 Try visiting the [the download page](https://download.slimerjs.org/releases) manually.
 If that page is blocked, you can try using a different CDN with the `SLIMERJS_CDNURL`
@@ -197,13 +198,13 @@ Author
 
 [Dan Pupius](https://github.com/dpup)
 ([personal website](http://pupius.co.uk)), supported by
-[The Obvious Corporation](http://obvious.com/).
+[The Obvious Corporation](https://obvious.com/).
 
 License
 -------
 
-Copyright 2012 [The Obvious Corporation](http://obvious.com/).
+Copyright 2012 [The Obvious Corporation](https://obvious.com/).
 
 Licensed under the Apache License, Version 2.0.
 See the top-level file `LICENSE.txt` and
-(http://www.apache.org/licenses/LICENSE-2.0).
+(https://www.apache.org/licenses/LICENSE-2.0).

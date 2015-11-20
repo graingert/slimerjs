@@ -15,7 +15,7 @@
   "licenses": [
     {
       "type": "Apache-2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     }
   ],
   "author": {
@@ -27,12 +27,12 @@
     {
       "name": "Thomas Grainger",
       "email": "tagrain@gmail.com",
-      "web": "http://graingert.co.uk/"
+      "web": "https://graingert.co.uk/"
     },
     {
       "name": "David Hanskopeit",
       "email": "david@monkey-works.de",
-      "web": "http://www.monkey-works.de/"
+      "web": "https://www.monkey-works.de/"
     }
   ],
   "main": "lib/slimerjs",
