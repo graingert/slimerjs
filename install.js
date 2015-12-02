@@ -343,9 +343,9 @@ function getDownloadUrl() {
   } else if (process.platform === 'linux' && process.arch == 'ia32') {
     downloadUrl += 'linux-i686.tar.bz2'
   } else if (process.platform === 'darwin' || process.platform === 'openbsd' || process.platform === 'freebsd') {
-    downloadUrl += 'macosx.zip'
+    downloadUrl += 'mac.tar.bz2'
   } else if (process.platform === 'win32') {
-    downloadUrl += 'windows.zip'
+    downloadUrl += 'win32.zip'
   } else {
     return null
   }
