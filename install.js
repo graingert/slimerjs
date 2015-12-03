@@ -335,8 +335,8 @@ function trySlimerjsOnPath() {
 function getDownloadUrl() {
   var cdnUrl = process.env.npm_config_slimerjs_cdnurl ||
       process.env.SLIMERJS_CDNURL ||
-      'https://download.slimerjs.org/releases/'
-  var downloadUrl = cdnUrl + helper.version +'/slimerjs-'+ helper.version +'-'
+      'https://download.slimerjs.org/releases'
+  var downloadUrl = cdnUrl + '/' + helper.version +'/slimerjs-'+ helper.version +'-'
 
   if (process.platform === 'linux' && process.arch === 'x64') {
     downloadUrl += 'linux-x86_64.tar.bz2'

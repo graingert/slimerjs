@@ -87,18 +87,18 @@ a download mirror. To set a mirror, set npm config property `slimerjs_cdnurl`.
 Default is ``.
 
 ```shell
-npm install slimerjs --slimerjs_cdnurl=https://cnpmjs.org/downloads
+npm install slimerjs --slimerjs_cdnurl=https://download.slimerjs.org/releases
 ```
 
 Or add property into your `.npmrc` file (https://www.npmjs.org/doc/files/npmrc.html)
 
 ```
-slimerjs_cdnurl=https://cnpmjs.org/downloads
+slimerjs_cdnurl=https://download.slimerjs.org/releases
 ```
 
 Another option is to use PATH variable `SLIMERJS_CDNURL`.
 ```shell
-SLIMERJS_CDNURL=https://cnpmjs.org/downloads npm install phantomjs
+SLIMERJS_CDNURL=https://download.slimerjs.org/releases npm install slimerjs
 ```
 
 ##### Using SlimerJS from disk
