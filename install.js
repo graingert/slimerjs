@@ -11,9 +11,9 @@ var progress = require('progress')
 var AdmZip = require('adm-zip')
 var cp = require('child_process')
 var fs = require('fs-extra')
+var hasha = require('hasha')
 var helper = require('./lib/slimerjs')
 var kew = require('kew')
-var npmconf = require('npmconf')
 var path = require('path')
 var request = require('request')
 var url = require('url')
@@ -39,9 +39,6 @@ process.env.PATH = helper.cleanPath(originalPath)
 var libPath = path.join(__dirname, 'lib')
 var pkgPath = path.join(libPath, 'slimer')
 var slimerPath = null
-var tmpPath = null
-
-var npmConfPromise = kew.nfcall(npmconf.load)
 
 // If the user manually installed SlimerJS, we want
 // to use the existing version.
@@ -55,20 +52,15 @@ var npmConfPromise = kew.nfcall(npmconf.load)
 // https://github.com/Obvious/phantomjs/issues/85
 // https://github.com/Medium/phantomjs/pull/184
 kew.resolve(true)
-  .then(function () {
-    return trySlimerjsOnPath()
-  })
-  .then(function () {
-    return downloadSlimerjs()
-  })
-  .then(function (downloadedFile) {
-    return extractDownload(downloadedFile)
-  })
+  .then(trySlimerjsInLib)
+  .then(trySlimerjsOnPath)
+  .then(downloadSlimerjs)
+  .then(extractDownload)
   .then(function (extractedPath) {
     return copyIntoPlace(extractedPath, pkgPath)
   })
   .then(function () {
-    var location = process.platform === 'win32' ?
+    var location = getTargetPlatform() === 'win32' ?
         path.join(pkgPath, 'slimerjs.bat') :
         path.join(pkgPath, 'slimerjs')
 
@@ -97,11 +89,22 @@ kew.resolve(true)
 
 function writeLocationFile(location) {
   console.log('Writing location.js file')
-  if (process.platform === 'win32') {
+  if (getTargetPlatform() === 'win32') {
     location = location.replace(/\\/g, '\\\\')
   }
-  fs.writeFileSync(path.join(libPath, 'location.js'),
-      'module.exports.location = "' + location + '"')
+
+  var platform = getTargetPlatform()
+  var arch = getTargetArch()
+
+  var contents = 'module.exports.location = "' + location + '"\n'
+
+  if (/^[a-zA-Z0-9]*$/.test(platform) && /^[a-zA-Z0-9]*$/.test(arch)) {
+    contents +=
+        'module.exports.platform = "' + getTargetPlatform() + '"\n' +
+        'module.exports.arch = "' + getTargetArch() + '"\n'
+  }
+
+  fs.writeFileSync(path.join(libPath, 'location.js'), contents)
 }
 
 function exit(code) {
@@ -111,10 +114,10 @@ function exit(code) {
 }
 
 
-function findSuitableTempDirectory(npmConf) {
+function findSuitableTempDirectory() {
   var now = Date.now()
   var candidateTmpDirs = [
-    process.env.TMPDIR || process.env.TEMP || npmConf.get('tmp'),
+    process.env.TMPDIR || process.env.TEMP || process.env.npm_config_tmp,
     '/tmp',
     path.join(process.cwd(), 'tmp')
   ]
@@ -143,13 +146,12 @@ function findSuitableTempDirectory(npmConf) {
 }
 
 
-function getRequestOptions(conf) {
-  var strictSSL = conf.get('strict-ssl')
+function getRequestOptions() {
+  var strictSSL = !!process.env.npm_config_strict_ssl
   if (process.version == 'v0.10.34') {
     console.log('Node v0.10.34 detected, turning off strict ssl due to https://github.com/joyent/node/issues/8894')
     strictSSL = false
   }
-
 
   var options = {
     uri: getDownloadUrl(),
@@ -159,7 +161,9 @@ function getRequestOptions(conf) {
     strictSSL: strictSSL
   }
 
-  var proxyUrl = conf.get('https-proxy') || conf.get('http-proxy') || conf.get('proxy')
+  var proxyUrl = process.env.npm_config_https_proxy ||
+      process.env.npm_config_http_proxy ||
+      process.env.npm_config_proxy
   if (proxyUrl) {
 
     // Print using proxy
@@ -172,21 +176,55 @@ function getRequestOptions(conf) {
 
     // Enable proxy
     options.proxy = proxyUrl
-
-    // If going through proxy, use the user-agent string from the npm config
-    options.headers['User-Agent'] = conf.get('user-agent')
   }
 
+  // Use the user-agent string from the npm config
+  options.headers['User-Agent'] = process.env.npm_config_user_agent
+
   // Use certificate authority settings from npm
-  var ca = conf.get('ca')
+  var ca = process.env.npm_config_ca
+  if (!ca && process.env.npm_config_cafile) {
+    try {
+      ca = fs.readFileSync(process.env.npm_config_cafile, {encoding: 'utf8'})
+        .split(/\n(?=-----BEGIN CERTIFICATE-----)/g)
+
+      // Comments at the beginning of the file result in the first
+      // item not containing a certificate - in this case the
+      // download will fail
+      if (ca.length > 0 && !/-----BEGIN CERTIFICATE-----/.test(ca[0])) {
+        ca.shift()
+      }
+
+    } catch (e) {
+      console.error('Could not read cafile', process.env.npm_config_cafile, e)
+    }
+  }
+
   if (ca) {
     console.log('Using npmconf ca')
-    options.ca = ca
+    options.agentOptions = {
+      ca: ca
+    }
   }
 
   return options
 }
 
+function handleRequestError(error) {
+  if (error && error.stack && error.stack.indexOf('SELF_SIGNED_CERT_IN_CHAIN') != -1) {
+      console.error('Error making request, SELF_SIGNED_CERT_IN_CHAIN. ' +
+          'Please read https://github.com/graingert/phantomjs#i-am-behind-a-corporate-proxy-that-uses-self-signed-ssl-certificates-to-intercept-encrypted-traffic')
+      exit(1)
+  } else if (error) {
+    console.error('Error making request.\n' + error.stack + '\n\n' +
+        'Please report this full log at https://github.com/graingert/phantomjs')
+    exit(1)
+  } else {
+    console.error('Something unexpected happened, please report this full ' +
+        'log at https://github.com/graingert/phantomjs')
+    exit(1)
+  }
+}
 
 function requestBinary(requestOptions, filePath) {
   var deferred = kew.defer()
@@ -212,25 +250,21 @@ function requestBinary(requestOptions, filePath) {
           'If you continue to have issues, please report this full log at ' +
           'https://github.com/graingert/slimerjs')
       exit(1)
-    } else if (error && error.stack && error.stack.indexOf('SELF_SIGNED_CERT_IN_CHAIN') != -1) {
-      console.error('Error making request, SELF_SIGNED_CERT_IN_CHAIN. Please read https://github.com/graingert/slimerjs#i-am-behind-a-corporate-proxy-that-uses-self-signed-ssl-certificates-to-intercept-encrypted-traffic')
-      exit(1)
-    } else if (error) {
-      console.error('Error making request.\n' + error.stack + '\n\n' +
-          'Please report this full log at https://github.com/graingert/slimerjs')
-      exit(1)
     } else {
-      console.error('Something unexpected happened, please report this full ' +
-          'log at https://github.com/graingert/slimerjs')
-      exit(1)
+      handleRequestError(error)
     }
   })).on('progress', function (state) {
-    if (!bar) {
-      bar = new progress('  [:bar] :percent :etas', {total: state.total, width: 40})
+    try {
+      if (!bar) {
+        bar = new progress('  [:bar] :percent', {total: state.size.total, width: 40})
+      }
+      bar.curr = state.size.transferred
+      bar.tick()
+    } catch (e) {
+      // It doesn't really matter if the progress bar doesn't update.
     }
-    bar.curr = state.received
-    bar.tick(0)
   })
+  .on('error', handleRequestError)
 
   return deferred.promise
 }
@@ -262,7 +296,7 @@ function extractDownload(filePath) {
 
   } else {
     console.log('Extracting tar contents (via spawned process)')
-    cp.execFile('tar', ['jxf', filePath], options, function (err) {
+    cp.execFile('tar', ['jxf', path.resolve(filePath)], options, function (err) {
       if (err) {
         console.error('Error extracting archive')
         deferred.reject(err)
@@ -294,9 +328,33 @@ function copyIntoPlace(extractedPath, targetPath) {
 }
 
 /**
+ * Check to see if the binary in lib is OK to use. If successful, exit the process.
+ */
+function trySlimerjsInLib() {
+  return kew.fcall(function () {
+    var libModule = require('./lib/location.js')
+    if (libModule.location &&
+        getTargetPlatform() == libModule.platform &&
+        getTargetArch() == libModule.arch &&
+        fs.statSync(path.join('./lib', libModule.location))) {
+      console.log('SlimerJS is previously installed at ' + libModule.location)
+      exit(0)
+    }
+  }).fail(function () {
+    // silently swallow any errors
+  })
+}
+
+/**
  * Check to see if the binary on PATH is OK to use. If successful, exit the process.
  */
 function trySlimerjsOnPath() {
+  if (getTargetPlatform() != process.platform || getTargetArch() != process.arch) {
+    console.log('Building for target platform ' + getTargetPlatform() + '/' + getTargetArch() +
+                '. Skipping PATH search')
+    return kew.resolve(false)
+  }
+
   return kew.nfcall(which, 'slimerjs')
   .then(function (result) {
     slimerPath = result
@@ -315,7 +373,7 @@ function trySlimerjsOnPath() {
       return checkSlimerjsVersion(slimerPath).then(function (matches) {
         if (matches) {
           writeLocationFile(slimerPath)
-          console.log('SlimerJS is already installed at', slimerPath + '.')
+          console.log('SlimerJS is already installed on PATH at', slimerPath)
           exit(0)
         }
       })
@@ -330,58 +388,105 @@ function trySlimerjsOnPath() {
 }
 
 /**
- * @return {?string} Get the download URL for slimerjs. May return null if no download url exists.
+ * @return {?string} Get the download URL for slimerjs.
+ *     May return null if no download url exists.
  */
 function getDownloadUrl() {
+  var spec = getDownloadSpec()
+  return spec && spec.url
+}
+
+/**
+ * @return {?{url: string, checksum: string}} Get the download URL and expected
+ *     SHA-256 checksum for phantomjs.  May return null if no download url exists.
+ */
+function getDownloadSpec() {
   var cdnUrl = process.env.npm_config_slimerjs_cdnurl ||
       process.env.SLIMERJS_CDNURL ||
       'https://download.slimerjs.org/releases'
   var downloadUrl = cdnUrl + '/' + helper.version +'/slimerjs-'+ helper.version +'-'
+  var checksum = ''
 
-  if (process.platform === 'linux' && process.arch === 'x64') {
+  var platform = getTargetPlatform()
+  var arch = getTargetArch()
+  if (platform === 'linux' && arch === 'x64') {
     downloadUrl += 'linux-x86_64.tar.bz2'
-  } else if (process.platform === 'linux' && process.arch == 'ia32') {
+    checksum = '14e707c838e85f8131fb59b8cc38b5d81b4d45c194db7432e97ff331c913b89d'
+  } else if (platform === 'linux' && arch == 'ia32') {
     downloadUrl += 'linux-i686.tar.bz2'
-  } else if (process.platform === 'darwin' || process.platform === 'openbsd' || process.platform === 'freebsd') {
+    checksum = '4bc37cb8c58e5ddfa76ffd066ebceb04529d74a0e52066d9bed9759c30e5841b'
+  } else if (platform === 'darwin' || platform === 'openbsd' || platform === 'freebsd') {
     downloadUrl += 'mac.tar.bz2'
-  } else if (process.platform === 'win32') {
+    checksum = '5c3ba9a83328a54b1fc6a6106abdd6d6b2117768f36ad43b9b0230a3ad7113cd'
+  } else if (platform === 'win32') {
     downloadUrl += 'win32.zip'
+    checksum = '4eead5e92a87f655f999ae79bf3c4eac191ec4bd93a19ffd8bbb2a12a1cb1ef4'
   } else {
     return null
   }
-  return downloadUrl
+  return {url: downloadUrl, checksum: checksum}
+}
 }
 
 /**
  * Download slimerjs, reusing the existing copy on disk if available.
  * Exits immediately if there is no binary to download.
+ * @return {Promise.<string>} The path to the downloaded file.
  */
 function downloadSlimerjs() {
-  var downloadUrl = getDownloadUrl()
-  if (!downloadUrl) {
+  var downloadSpec = getDownloadSpec()
+  if (!downloadSpec) {
     console.error(
-        'Unexpected platform or architecture: ' + process.platform + '/' + process.arch + '\n' +
+        'Unexpected platform or architecture: ' + getTargetPlatform() + '/' + getTargetArch() + '\n' +
         'It seems there is no binary available for your platform/architecture\n' +
         'Try to install SlimerJS globally')
     exit(1)
   }
 
-  return npmConfPromise.then(function (conf) {
-    tmpPath = findSuitableTempDirectory(conf)
+  var downloadUrl = downloadSpec.url
+  var downloadedFile
 
+  return kew.fcall(function () {
     // Can't use a global version so start a download.
+    var tmpPath = findSuitableTempDirectory()
     var fileName = downloadUrl.split('/').pop()
-    var downloadedFile = path.join(tmpPath, fileName)
+    downloadedFile = path.join(tmpPath, fileName)
 
-    // Start the install.
-    if (!fs.existsSync(downloadedFile)) {
-      console.log('Downloading', downloadUrl)
-      console.log('Saving to', downloadedFile)
-      return requestBinary(getRequestOptions(conf), downloadedFile)
-    } else {
+    if (fs.existsSync(downloadedFile)) {
       console.log('Download already available at', downloadedFile)
+      return verifyChecksum(downloadedFile, downloadSpec.checksum)
+    }
+    return false
+  }).then(function (verified) {
+    if (verified) {
       return downloadedFile
     }
+
+    // Start the install.
+    console.log('Downloading', downloadUrl)
+    console.log('Saving to', downloadedFile)
+    return requestBinary(getRequestOptions(), downloadedFile)
+  })
+}
+
+/**
+ * Check to make sure that the file matches the checksum.
+ * @param {string} fileName
+ * @param {string} checksum
+ * @return {Promise.<boolean>}
+ */
+function verifyChecksum(fileName, checksum) {
+  return kew.resolve(hasha.fromFile(fileName, {algorithm: 'sha256'})).then(function (hash) {
+    var result = checksum == hash
+    if (result) {
+      console.log('Verified checksum of previously downloaded file')
+    } else {
+      console.log('Checksum did not match')
+    }
+    return result
+  }).fail(function (err) {
+    console.error('Failed to verify checksum: ', err)
+    return false
   })
 }
 
@@ -403,4 +508,18 @@ function checkSlimerjsVersion(slimerPath) {
     console.error('Error verifying slimerjs, continuing', err)
     return false
   })
+}
+
+/**
+ * @return {string}
+ */
+function getTargetPlatform() {
+  return process.env.SLIMERJS_PLATFORM || process.platform
+}
+
+/**
+ * @return {string}
+ */
+function getTargetArch() {
+  return process.env.SLIMERJS_ARCH || process.arch
 }
