@@ -426,7 +426,6 @@ function getDownloadSpec() {
   }
   return {url: downloadUrl, checksum: checksum}
 }
-}
 
 /**
  * Download slimerjs, reusing the existing copy on disk if available.
