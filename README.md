@@ -172,7 +172,7 @@ Do you live in China, or a country with an authoritarian government? We've seen 
 the GFW or local ISP blocks https://slimerjs.org, preventing the installer from downloading the
 binary.
 
-Try visiting the [the download page](https://download.slimerjs.org/releases) manually.
+Try visiting [the download page](https://download.slimerjs.org/releases) manually.
 If that page is blocked, you can try using a different CDN with the `SLIMERJS_CDNURL`
 env variable described above.
 

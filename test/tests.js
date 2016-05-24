@@ -6,7 +6,9 @@
 var childProcess = require('child_process')
 var fs = require('fs')
 var path = require('path')
+var location = require('../lib/location')
 var slimerjs = require('../lib/slimerjs')
+var util = require('../lib/util')
 
 
 exports.testDownload = function (test) {
@@ -60,4 +62,37 @@ exports.testCleanPath = function (test) {
   test.equal('', slimerjs.cleanPath('./bin'))
   test.equal('/Work/bin:/usr/bin', slimerjs.cleanPath('/Work/bin:/Work/slimerjs/node_modules/.bin:/usr/bin'))
   test.done()
+}
+
+exports.testBogusReinstallLocation = function (test) {
+  util.maybeLinkLibModule('./blargh')
+  .then(function (success) {
+    test.ok(!success, 'Expected link to fail')
+    test.done()
+  })
+}
+
+exports.testSuccessfulReinstallLocation = function (test) {
+  util.maybeLinkLibModule(path.resolve(__dirname, '../lib/location'))
+  .then(function (success) {
+    test.ok(success, 'Expected link to succeed')
+    test.done()
+  })
+}
+
+exports.testBogusVerifyChecksum = function (test) {
+  util.verifyChecksum(path.resolve(__dirname, './exit.js'), 'blargh')
+  .then(function (success) {
+    test.ok(!success, 'Expected checksum to fail')
+    test.done()
+  })
+}
+
+exports.testSuccessfulVerifyChecksum = function (test) {
+  util.verifyChecksum(path.resolve(__dirname, './exit.js'),
+                      '31dfa8fd11176e00d29fa27aa32c5af64de46c121c059fe41c2543fcae4318fd')
+  .then(function (success) {
+    test.ok(success, 'Expected checksum to succeed')
+    test.done()
+  })
 }

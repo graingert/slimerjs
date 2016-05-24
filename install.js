@@ -8,18 +8,26 @@
 
 var requestProgress = require('request-progress')
 var progress = require('progress')
-var AdmZip = require('adm-zip')
+var extractZip = require('extract-zip')
 var cp = require('child_process')
 var fs = require('fs-extra')
-var hasha = require('hasha')
 var helper = require('./lib/slimerjs')
 var kew = require('kew')
 var path = require('path')
 var request = require('request')
 var url = require('url')
+var util = require('./lib/util')
 var which = require('which')
 
 var originalPath = process.env.PATH
+
+var checkSlimerjsVersion = util.checkSlimerjsVersion
+var getTargetPlatform = util.getTargetPlatform
+var getTargetArch = util.getTargetArch
+var getDownloadSpec = util.getDownloadSpec
+var maybeLinkLibModule = util.maybeLinkLibModule
+var verifyChecksum = util.verifyCheckum
+var writeLocationFile = util.writeLocationFile
 
 // If the process exits without going through exit(), then we did not complete.
 var validExit = false
@@ -85,27 +93,6 @@ kew.resolve(true)
     console.error('Slimer installation failed', err, err.stack)
     exit(1)
   })
-
-
-function writeLocationFile(location) {
-  console.log('Writing location.js file')
-  if (getTargetPlatform() === 'win32') {
-    location = location.replace(/\\/g, '\\\\')
-  }
-
-  var platform = getTargetPlatform()
-  var arch = getTargetArch()
-
-  var contents = 'module.exports.location = "' + location + '"\n'
-
-  if (/^[a-zA-Z0-9]*$/.test(platform) && /^[a-zA-Z0-9]*$/.test(arch)) {
-    contents +=
-        'module.exports.platform = "' + getTargetPlatform() + '"\n' +
-        'module.exports.arch = "' + getTargetArch() + '"\n'
-  }
-
-  fs.writeFileSync(path.join(libPath, 'location.js'), contents)
-}
 
 function exit(code) {
   validExit = true
@@ -205,6 +192,7 @@ function getRequestOptions() {
     options.agentOptions = {
       ca: ca
     }
+    options.ca = ca
   }
 
   return options
@@ -284,15 +272,14 @@ function extractDownload(filePath) {
 
   if (filePath.substr(-4) === '.zip') {
     console.log('Extracting zip contents')
-
-    try {
-      var zip = new AdmZip(filePath)
-      zip.extractAllTo(extractedPath, true)
-      deferred.resolve(extractedPath)
-    } catch (err) {
-      console.error('Error extracting zip')
-      deferred.reject(err)
-    }
+    extractZip(path.resolve(filePath), {dir: extractedPath}, function(err) {
+      if (err) {
+        console.error('Error extracting zip')
+        deferred.reject(err)
+      } else {
+        deferred.resolve(extractedPath)
+      }
+    })
 
   } else {
     console.log('Extracting tar contents (via spawned process)')
@@ -332,14 +319,9 @@ function copyIntoPlace(extractedPath, targetPath) {
  */
 function trySlimerjsInLib() {
   return kew.fcall(function () {
-    var libModule = require('./lib/location.js')
-    if (libModule.location &&
-        getTargetPlatform() == libModule.platform &&
-        getTargetArch() == libModule.arch &&
-        fs.statSync(path.join('./lib', libModule.location))) {
-      console.log('SlimerJS is previously installed at ' + libModule.location)
-      exit(0)
-    }
+    return maybeLinkLibModule(path.resolve(__dirname, './lib/location.js'))
+  }).then(function (success) {
+    if (success) exit(0)
   }).fail(function () {
     // silently swallow any errors
   })
@@ -358,17 +340,24 @@ function trySlimerjsOnPath() {
   return kew.nfcall(which, 'slimerjs')
   .then(function (result) {
     slimerPath = result
+    console.log('Considering SlimerJS found at', slimerPath)
 
     // Horrible hack to avoid problems during global install. We check to see if
     // the file `which` found is our own bin script.
     if (slimerPath.indexOf(path.join('npm', 'slimerjs')) !== -1) {
-      console.log('Looks like an `npm install -g` on windows; unable to check for already installed version.')
+      console.log('Looks like an `npm install -g` on windows; skipping installed version.')
       return
     }
 
     var contents = fs.readFileSync(slimerPath, 'utf8')
     if (/NPM_INSTALL_MARKER/.test(contents)) {
-      console.log('Looks like an `npm install -g`; unable to check for already installed version.')
+      console.log('Looks like an `npm install -g`')
+
+      return maybeLinkLibModule(path.resolve(fs.realpathSync(slimerPath), '../../lib/location'))
+      .then(function (success) {
+        if (success) exit(0)
+        console.log('Could not link global install, skipping...')
+      })
     } else {
       return checkSlimerjsVersion(slimerPath).then(function (matches) {
         if (matches) {
@@ -394,37 +383,6 @@ function trySlimerjsOnPath() {
 function getDownloadUrl() {
   var spec = getDownloadSpec()
   return spec && spec.url
-}
-
-/**
- * @return {?{url: string, checksum: string}} Get the download URL and expected
- *     SHA-256 checksum for phantomjs.  May return null if no download url exists.
- */
-function getDownloadSpec() {
-  var cdnUrl = process.env.npm_config_slimerjs_cdnurl ||
-      process.env.SLIMERJS_CDNURL ||
-      'https://download.slimerjs.org/releases'
-  var downloadUrl = cdnUrl + '/' + helper.version +'/slimerjs-'+ helper.version +'-'
-  var checksum = ''
-
-  var platform = getTargetPlatform()
-  var arch = getTargetArch()
-  if (platform === 'linux' && arch === 'x64') {
-    downloadUrl += 'linux-x86_64.tar.bz2'
-    checksum = '14e707c838e85f8131fb59b8cc38b5d81b4d45c194db7432e97ff331c913b89d'
-  } else if (platform === 'linux' && arch == 'ia32') {
-    downloadUrl += 'linux-i686.tar.bz2'
-    checksum = '4bc37cb8c58e5ddfa76ffd066ebceb04529d74a0e52066d9bed9759c30e5841b'
-  } else if (platform === 'darwin' || platform === 'openbsd' || platform === 'freebsd') {
-    downloadUrl += 'mac.tar.bz2'
-    checksum = '5c3ba9a83328a54b1fc6a6106abdd6d6b2117768f36ad43b9b0230a3ad7113cd'
-  } else if (platform === 'win32') {
-    downloadUrl += 'win32.zip'
-    checksum = '4eead5e92a87f655f999ae79bf3c4eac191ec4bd93a19ffd8bbb2a12a1cb1ef4'
-  } else {
-    return null
-  }
-  return {url: downloadUrl, checksum: checksum}
 }
 
 /**
@@ -466,59 +424,4 @@ function downloadSlimerjs() {
     console.log('Saving to', downloadedFile)
     return requestBinary(getRequestOptions(), downloadedFile)
   })
-}
-
-/**
- * Check to make sure that the file matches the checksum.
- * @param {string} fileName
- * @param {string} checksum
- * @return {Promise.<boolean>}
- */
-function verifyChecksum(fileName, checksum) {
-  return kew.resolve(hasha.fromFile(fileName, {algorithm: 'sha256'})).then(function (hash) {
-    var result = checksum == hash
-    if (result) {
-      console.log('Verified checksum of previously downloaded file')
-    } else {
-      console.log('Checksum did not match')
-    }
-    return result
-  }).fail(function (err) {
-    console.error('Failed to verify checksum: ', err)
-    return false
-  })
-}
-
-/**
- * Check to make sure a given binary is the right version.
- * @return {kew.Promise.<boolean>}
- */
-function checkSlimerjsVersion(slimerPath) {
-  console.log('Found SlimerJS at', slimerPath, '...verifying')
-  return kew.nfcall(cp.execFile, slimerPath, ['--version']).then(function (stdout) {
-    var version = stdout.trim()
-    if (helper.version == version) {
-      return true
-    } else {
-      console.log('SlimerJS detected, but wrong version', stdout.trim(), '@', slimerPath + '.')
-      return false
-    }
-  }).fail(function (err) {
-    console.error('Error verifying slimerjs, continuing', err)
-    return false
-  })
-}
-
-/**
- * @return {string}
- */
-function getTargetPlatform() {
-  return process.env.SLIMERJS_PLATFORM || process.platform
-}
-
-/**
- * @return {string}
- */
-function getTargetArch() {
-  return process.env.SLIMERJS_ARCH || process.arch
 }
