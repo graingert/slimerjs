@@ -201,15 +201,15 @@ function getRequestOptions() {
 function handleRequestError(error) {
   if (error && error.stack && error.stack.indexOf('SELF_SIGNED_CERT_IN_CHAIN') != -1) {
       console.error('Error making request, SELF_SIGNED_CERT_IN_CHAIN. ' +
-          'Please read https://github.com/graingert/phantomjs#i-am-behind-a-corporate-proxy-that-uses-self-signed-ssl-certificates-to-intercept-encrypted-traffic')
+          'Please read https://github.com/graingert/slimerjs#i-am-behind-a-corporate-proxy-that-uses-self-signed-ssl-certificates-to-intercept-encrypted-traffic')
       exit(1)
   } else if (error) {
     console.error('Error making request.\n' + error.stack + '\n\n' +
-        'Please report this full log at https://github.com/graingert/phantomjs')
+        'Please report this full log at https://github.com/graingert/slimerjs')
     exit(1)
   } else {
     console.error('Something unexpected happened, please report this full ' +
-        'log at https://github.com/graingert/phantomjs')
+        'log at https://github.com/graingert/slimerjs')
     exit(1)
   }
 }
