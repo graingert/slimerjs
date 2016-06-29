@@ -1,3 +1,7 @@
+0.10.0
+======
+0.10.0 will not be supported by this repo. If you want 0.10.0 on npm see [laurentj/slimerjs#489](https://github.com/laurentj/slimerjs/issues/489)
+
 slimerjs
 =========
 
