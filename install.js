@@ -18,6 +18,7 @@ var request = require('request')
 var url = require('url')
 var util = require('./lib/util')
 var which = require('which')
+var os = require('os')
 
 var originalPath = process.env.PATH
 
@@ -25,7 +26,7 @@ var checkSlimerjsVersion = util.checkSlimerjsVersion
 var getTargetPlatform = util.getTargetPlatform
 var getTargetArch = util.getTargetArch
 var getDownloadSpec = util.getDownloadSpec
-var maybeLinkLibModule = util.maybeLinkLibModule
+var findValidSlimerJsBinary = util.findValidSlimerJsBinary
 var verifyChecksum = util.verifyChecksum
 var writeLocationFile = util.writeLocationFile
 
@@ -104,15 +105,17 @@ function exit(code) {
 function findSuitableTempDirectory() {
   var now = Date.now()
   var candidateTmpDirs = [
-    process.env.TMPDIR || process.env.TEMP || process.env.npm_config_tmp,
-    '/tmp',
+    process.env.npm_config_tmp,
+    os.tmpdir(),
     path.join(process.cwd(), 'tmp')
   ]
 
   for (var i = 0; i < candidateTmpDirs.length; i++) {
-    var candidatePath = path.join(candidateTmpDirs[i], 'slimerjs')
+    var candidatePath = candidateTmpDirs[i]
+    if (!candidatePath) continue
 
     try {
+      candidatePath = path.join(path.resolve(candidatePath), 'slimerjs')
       fs.mkdirsSync(candidatePath, '0777')
       // Make double sure we have 0777 permissions; some operating systems
       // default umask does not allow write by default.
@@ -319,9 +322,12 @@ function copyIntoPlace(extractedPath, targetPath) {
  */
 function trySlimerjsInLib() {
   return kew.fcall(function () {
-    return maybeLinkLibModule(path.resolve(__dirname, './lib/location.js'))
-  }).then(function (success) {
-    if (success) exit(0)
+    return findValidSlimerJsBinary(path.resolve(__dirname, './lib/location.js'))
+  }).then(function (binaryLocation) {
+    if (binaryLocation) {
+      console.log('SlimerJS is previously installed at', binaryLocation)
+      exit(0)
+    }
   }).fail(function () {
     // silently swallow any errors
   })
@@ -353,9 +359,14 @@ function trySlimerjsOnPath() {
     if (/NPM_INSTALL_MARKER/.test(contents)) {
       console.log('Looks like an `npm install -g`')
 
-      return maybeLinkLibModule(path.resolve(fs.realpathSync(slimerPath), '../../lib/location'))
-      .then(function (success) {
-        if (success) exit(0)
+      var slimerLibPath = path.resolve(fs.realpathSync(slimerPath), '../../lib/location')
+      return findValidSlimerJsBinary(slimerLibPath)
+      .then(function (binaryLocation) {
+        if (binaryLocation) {
+          writeLocationFile(binaryLocation)
+          console.log('SlimerJS linked at', slimerLibPath)
+          exit(0)
+        }
         console.log('Could not link global install, skipping...')
       })
     } else {

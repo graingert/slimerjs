@@ -64,6 +64,40 @@ childProcess.execFile(binPath, childArgs, function(err, stdout, stderr) {
 
 ```
 
+Or `exec()` method is also provided for convenience:
+
+```javascript
+var slimerjs = require('slimerjs')
+var program = slimerjs.exec('slimerjs-script.js', 'arg1', 'arg2')
+program.stdout.pipe(process.stdout)
+program.stderr.pipe(process.stderr)
+program.on('exit', code => {
+  // do something on end
+})
+```
+
+Note: [childProcess.spawn()](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options) is called inside `exec()`.
+
+Running with WebDriver
+----------------------
+
+`run()` method detects when SlimerJS gets ready. It's handy to use with WebDriver (Selenium).
+
+```javascript
+var phantomjs = require('slimerjs')
+var webdriverio = require('webdriverio')
+var wdOpts = { desiredCapabilities: { browserName: 'slimerjs' } }
+
+slimerjs.run('--webdriver=4444').then(program => {
+  webdriverio.remote(wdOpts).init()
+    .url('https://developer.mozilla.org/en-US/')
+    .getTitle().then(title => {
+      console.log(title) // 'Mozilla Developer Network'
+      program.kill() // quits SlimerJS
+    })
+})
+```
+
 Versioning
 ----------
 
@@ -158,7 +192,7 @@ Check your specific error message for more information.
 
 ##### Installation fails with `Error: EPERM` or `operation not permitted` or `permission denied`
 
-This error means that NPM was not able to install phantomjs to the file system. There are three
+This error means that NPM was not able to install slimerjs to the file system. There are three
 major reasons why this could happen:
 
 - You don't have write access to the installation directory.
