@@ -161,7 +161,7 @@ If you know in advance that you want to install SlimerJS for a specific architec
 you can set the environment variables: `SLIMERJS_PLATFORM`
 (to set target platform) and `SLIMERJS_ARCH` (to set target
 arch), where `platform` and `arch` are valid values for
-[process.platform and process.arch](https://nodejs.org/api/process.html).
+[process.platform](https://nodejs.org/api/process.html#process_process_platform) and [process.arch](https://nodejs.org/api/process.html#process_process_arch).
 
 A Note on SlimerJS
 -------------------
