@@ -84,7 +84,7 @@ Running with WebDriver
 `run()` method detects when SlimerJS gets ready. It's handy to use with WebDriver (Selenium).
 
 ```javascript
-var phantomjs = require('slimerjs')
+var slimerjs = require('slimerjs')
 var webdriverio = require('webdriverio')
 var wdOpts = { desiredCapabilities: { browserName: 'slimerjs' } }
 
